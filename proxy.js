@@ -1,48 +1,75 @@
-// Replace upload.single("file") with upload.any()
+import express from "express";
+import fetch from "node-fetch";
+import path from "path";
+import { fileURLToPath } from "url";
+import multer from "multer";
+import FormData from "form-data";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const app = express();
+const upload = multer(); // handles multipart/form-data
+
+app.use(express.json());
+app.use(express.static(path.join(__dirname, "public")));
+
+// CORS middleware
+app.use((req, res, next) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    if (req.method === "OPTIONS") return res.sendStatus(200);
+    next();
+});
+
+// Proxy all Discord API requests
 app.all("/proxy/:path(*)", upload.any(), async (req, res) => {
-  const token = req.headers["authorization"];
-  if (!token) return res.status(401).json({ message: "Missing Authorization header" });
+    const token = req.headers["authorization"];
+    if (!token) return res.status(401).json({ message: "Missing Authorization header" });
 
-  const url = "https://discord.com/api/v10/" + req.params.path;
+    const url = "https://discord.com/api/v10/" + req.params.path;
 
-  try {
-    let headers = { Authorization: token };
-    let body;
+    try {
+        let headers = { Authorization: token };
+        let body;
 
-    // If any files were uploaded, build a FormData and append all of them
-    if (req.files && req.files.length > 0) {
-      body = new FormData();
-      // append each file as 'file' field (Discord accepts repeated file fields)
-      for (let i = 0; i < req.files.length; i++) {
-        const f = req.files[i];
-        body.append("file", f.buffer, {
-          filename: f.originalname,
-          contentType: f.mimetype,
-          knownLength: f.size,
-        });
-      }
-      // Also append other form fields (e.g. content)
-      for (const k in req.body) {
-        if (req.body.hasOwnProperty(k) && req.body[k] !== undefined) {
-          body.append(k, req.body[k]);
+        if (req.files && req.files.length > 0) {
+            // Build multipart body with multiple files
+            body = new FormData();
+            req.files.forEach((file, idx) => {
+                body.append(`files[${idx}]`, file.buffer, {
+                    filename: file.originalname,
+                    contentType: file.mimetype,
+                    knownLength: file.size,
+                });
+            });
+            // Add JSON payload (message content, embeds, etc.)
+            if (req.body.content) body.append("content", req.body.content);
+            if (req.body.payload_json) body.append("payload_json", req.body.payload_json);
+
+            headers = { ...headers, ...body.getHeaders() };
+        } else if (!["GET", "HEAD"].includes(req.method)) {
+            body = JSON.stringify(req.body);
+            headers["Content-Type"] = "application/json";
         }
-      }
-      headers = { ...headers, ...body.getHeaders() };
-    } else if (!["GET", "HEAD"].includes(req.method)) {
-      body = JSON.stringify(req.body);
-      headers["Content-Type"] = "application/json";
+
+        const response = await fetch(url, {
+            method: req.method,
+            headers,
+            body,
+        });
+
+        const text = await response.text();
+        res.status(response.status).send(text);
+    } catch (err) {
+        console.error("Proxy error:", err);
+        res.status(500).send("Proxy error");
     }
+});
 
-    const response = await fetch(url, {
-      method: req.method,
-      headers,
-      body,
-    });
-
-    const text = await response.text();
-    res.status(response.status).send(text);
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Proxy error");
-  }
+// For Railway/Heroku/etc deployment
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Proxy running on http://localhost:${PORT}`);
 });
