@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Discord Login</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<h2>Login (Research)</h2>
+<input type="text" id="token" placeholder="Bot or User Token" style="width:300px">
+<button onclick="login()">Login</button>
+<div id="status"></div>
+
+<script>
+function proxyFetch(path,method,body,callback){
+    var xhr = new XMLHttpRequest();
+    xhr.open(method,"/proxy/"+path,true);
+    xhr.setRequestHeader("Authorization",document.getElementById("token").value);
+    xhr.setRequestHeader("Content-Type","application/json");
+    xhr.onreadystatechange=function(){
+        if(xhr.readyState===4){ callback(xhr); }
+    };
+    xhr.send(body?JSON.stringify(body):null);
+}
+
+function login(){
+    var token=document.getElementById("token").value;
+    if(!token) return alert("Enter token");
+    proxyFetch("users/@me","GET",null,function(xhr){
+        if(xhr.status===200){
+            localStorage.setItem("botToken",token);
+            window.location.href="client.html";
+        } else {
+            document.getElementById("status").innerText="Invalid token!";
+        }
+    });
+}
+</script>
+</body>
+</html>
