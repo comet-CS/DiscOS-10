@@ -4,18 +4,17 @@ import path from "path";
 import { fileURLToPath } from "url";
 import multer from "multer";
 import FormData from "form-data";
+import zlib from "zlib";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const upload = multer(); // parse multipart/form-data
+const upload = multer();
 
-// Serve your frontend
 app.use(express.static(path.join(__dirname, "public")));
 app.use(express.json());
 
-// CORS for frontend
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
@@ -24,7 +23,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// Proxy route
 app.all("/proxy/:path(*)", upload.any(), async (req, res) => {
   const token = req.headers["authorization"];
   if (!token) return res.status(401).json({ message: "Missing Authorization header" });
@@ -35,7 +33,6 @@ app.all("/proxy/:path(*)", upload.any(), async (req, res) => {
     let headers = { Authorization: token };
     let body;
 
-    // Handle file uploads (single or multiple)
     if (req.files && req.files.length > 0) {
       body = new FormData();
       req.files.forEach((file, i) => {
@@ -58,24 +55,31 @@ app.all("/proxy/:path(*)", upload.any(), async (req, res) => {
       body,
     });
 
-    // Remove content-encoding to avoid browser decode errors
+    // Copy status
     res.status(response.status);
+
+    // Copy headers (except content-encoding to avoid decode errors)
     response.headers.forEach((val, key) => {
-      if (key.toLowerCase() !== "content-encoding") {
+      if (!["content-encoding", "content-length"].includes(key.toLowerCase())) {
         res.setHeader(key, val);
       }
     });
 
-    // Stream response directly
-    response.body.pipe(res);
+    const buffer = await response.buffer();
+
+    // If JSON, parse and return
+    const contentType = response.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      res.send(buffer.toString("utf-8"));
+    } else {
+      // binary (images, attachments)
+      res.send(buffer);
+    }
   } catch (err) {
     console.error(err);
     res.status(500).send("Proxy error");
   }
 });
 
-// Vercel automatically provides a port; fallback to 3000 locally
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Proxy running on port ${PORT}`);
-});
+app.listen(PORT, "0.0.0.0", () => console.log(`Proxy running on port ${PORT}`));
