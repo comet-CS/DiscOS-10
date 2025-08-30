@@ -9,56 +9,73 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const upload = multer();
+const upload = multer(); // parse multipart/form-data
 
+// Serve your frontend
+app.use(express.static(path.join(__dirname, "public")));
 app.use(express.json());
 
-// --- PROXY FIRST ---
-app.all("/proxy/:path(*)", upload.any(), async (req, res) => {
-    const token = req.headers["authorization"];
-    if (!token) return res.status(401).json({ message: "Missing Authorization header" });
-
-    const url = "https://discord.com/api/v10/" + req.params.path;
-
-    try {
-        let headers = { Authorization: token };
-        let body;
-
-        if (req.files && req.files.length > 0) {
-            body = new FormData();
-            req.files.forEach((file, idx) => {
-                body.append(`files[${idx}]`, file.buffer, {
-                    filename: file.originalname,
-                    contentType: file.mimetype,
-                });
-            });
-            if (req.body.content) body.append("content", req.body.content);
-            if (req.body.payload_json) body.append("payload_json", req.body.payload_json);
-            headers = { ...headers, ...body.getHeaders() };
-        } else if (!["GET", "HEAD"].includes(req.method) && Object.keys(req.body || {}).length > 0) {
-            body = JSON.stringify(req.body);
-            headers["Content-Type"] = "application/json";
-        }
-
-        const response = await fetch(url, {
-            method: req.method,
-            headers,
-            body,
-        });
-
-        res.status(response.status);
-        response.headers.forEach((val, key) => res.setHeader(key, val));
-        response.body.pipe(res); // stream response directly
-    } catch (err) {
-        console.error("Proxy error:", err);
-        res.status(500).send("Proxy error");
-    }
+// CORS for frontend
+app.use((req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  if (req.method === "OPTIONS") return res.sendStatus(200);
+  next();
 });
 
-// --- STATIC AFTER ---
-app.use(express.static(path.join(__dirname, "public")));
+// Proxy route
+app.all("/proxy/:path(*)", upload.any(), async (req, res) => {
+  const token = req.headers["authorization"];
+  if (!token) return res.status(401).json({ message: "Missing Authorization header" });
 
+  const url = "https://discord.com/api/v10/" + req.params.path;
+
+  try {
+    let headers = { Authorization: token };
+    let body;
+
+    // Handle file uploads (single or multiple)
+    if (req.files && req.files.length > 0) {
+      body = new FormData();
+      req.files.forEach((file, i) => {
+        body.append("file" + i, file.buffer, {
+          filename: file.originalname,
+          contentType: file.mimetype,
+          knownLength: file.size,
+        });
+      });
+      if (req.body.content) body.append("content", req.body.content);
+      headers = { ...headers, ...body.getHeaders() };
+    } else if (!["GET", "HEAD"].includes(req.method)) {
+      body = JSON.stringify(req.body);
+      headers["Content-Type"] = "application/json";
+    }
+
+    const response = await fetch(url, {
+      method: req.method,
+      headers,
+      body,
+    });
+
+    // Remove content-encoding to avoid browser decode errors
+    res.status(response.status);
+    response.headers.forEach((val, key) => {
+      if (key.toLowerCase() !== "content-encoding") {
+        res.setHeader(key, val);
+      }
+    });
+
+    // Stream response directly
+    response.body.pipe(res);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Proxy error");
+  }
+});
+
+// Vercel automatically provides a port; fallback to 3000 locally
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Proxy running on http://localhost:${PORT}`);
+  console.log(`Proxy running on port ${PORT}`);
 });
