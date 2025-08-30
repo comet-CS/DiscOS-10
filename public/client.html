@@ -5,6 +5,7 @@
 <title>Discord Mobile Client — Multi-file + Drag & Drop</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
+    /* === UI Layout from your original design === */
     body { margin:0; padding:0; font-family:sans-serif; background:#181818; color:#eee; -webkit-text-size-adjust:100%; }
     #container { display:flex; height:100vh; width:100vw; }
     #servers { width:60px; background:#202020; display:flex; flex-direction:column; align-items:center; border-right:1px solid #444; overflow:auto; }
@@ -23,6 +24,8 @@
     .previewItem img, .previewItem video { max-width:100%; max-height:100%; display:block; }
     .removeFileBtn { position:absolute; top:4px; right:4px; background:rgba(0,0,0,0.6); color:#fff; border:none; padding:2px 5px; font-size:12px; border-radius:3px; cursor:pointer; }
     #dropOverlay { position:absolute; left:0; top:0; width:100%; height:100%; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.5); z-index:1000; color:#fff; font-size:20px; }
+    #servers img.server-avatar.selected { border-color:#7289da; }
+    .channel.selected { background:#3b3b3b; }
     @media (max-width:420px) { .message img, .message video { max-width:150px; max-height:150px; } .previewItem { width:70px; height:70px; } }
 </style>
 </head>
@@ -54,6 +57,7 @@ var currentMode="guild", selectedGuild=null, selectedChannel=null, selectedDM=nu
 var previewContainer=document.getElementById("filePreview");
 var dropOverlay=document.getElementById("dropOverlay");
 
+// === proxyFetch helper (XHR) ===
 function proxyFetch(path, method, body, callback, isForm){
     var xhr=new XMLHttpRequest();
     xhr.open(method,"/proxy/"+path,true);
@@ -68,20 +72,18 @@ function proxyFetch(path, method, body, callback, isForm){
     xhr.send(body?(isForm?body:JSON.stringify(body)):null);
 }
 
+// === File selection / Drag & Drop ===
 var fileInput=document.getElementById("fileInput"), fileBtn=document.getElementById("fileBtn");
 fileBtn.addEventListener("click",()=>fileInput.click());
 fileInput.addEventListener("change",function(e){ var files=e.target.files; if(files){ for(var i=0;i<files.length;i++) addFile(files[i]); fileInput.value=""; renderPreview(); } });
-
 function showDropOverlay(show){ dropOverlay.style.display=show?"flex":"none"; }
 document.addEventListener("dragenter",function(e){ e.preventDefault(); showDropOverlay(true); });
 document.addEventListener("dragover",function(e){ e.preventDefault(); });
 document.addEventListener("dragleave",function(e){ showDropOverlay(false); });
 document.addEventListener("drop",function(e){ e.preventDefault(); showDropOverlay(false); var dt=e.dataTransfer; if(dt && dt.files){ for(var i=0;i<dt.files.length;i++) addFile(dt.files[i]); renderPreview(); } });
-
 function addFile(file){ fileList.push(file); }
 function removeFileAt(index){ if(index>=0 && index<fileList.length){ fileList.splice(index,1); renderPreview(); } }
 function clearFileSelection(){ fileList=[]; renderPreview(); }
-
 function renderPreview(){
     previewContainer.innerHTML="";
     for(var i=0;i<fileList.length;i++){
@@ -97,8 +99,8 @@ function renderPreview(){
     }
 }
 
+// === Guilds / Channels / DMs logic ===
 function escapeHtml(s){ if(!s)return""; return String(s).replace(/[&<>"']/g,function(m){ return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]; }); }
-
 function loadGuilds(){
     proxyFetch("users/@me/guilds","GET",null,function(guilds){
         var root=document.getElementById("servers");
@@ -114,7 +116,6 @@ function loadGuilds(){
 }
 
 function selectGuild(guildId){ selectedGuild=guildId; currentMode="guild"; loadChannels(guildId); }
-
 function loadChannels(guildId){
     proxyFetch("guilds/"+guildId+"/channels","GET",null,function(channels){
         var html=""; if(channels&&channels.length){ for(var i=0;i<channels.length;i++){ var c=channels[i]; if(c.type===0) html+='<button class="channel" onclick="selectChannel(\''+c.id+'\', this)">'+escapeHtml(c.name)+'</button>'; } }
@@ -145,18 +146,14 @@ function loadMessages(channelId){
 }
 
 function toggleDMs(){ if(currentMode==="guild"){ currentMode="dm"; loadDMs(); } else { currentMode="guild"; if(selectedGuild) loadChannels(selectedGuild); } }
-
 function loadDMs(){ proxyFetch("users/@me/channels","GET",null,function(channels){ var html=""; for(var i=0;i<channels.length;i++){ var c=channels[i], name=(c.type===1 && c.recipients && c.recipients[0])?c.recipients[0].username:(c.name||"Group"); html+='<button class="channel" onclick="selectDM(\''+c.id+'\', this)">'+escapeHtml(name)+'</button>'; } document.getElementById("channels").innerHTML=html; }); }
-
 function selectDM(dmId,btn){ selectedDM=dmId; selectedChannel=null; var btns=document.getElementsByClassName("channel"); for(var i=0;i<btns.length;i++) btns[i].className="channel"; if(btn) btn.className="channel selected"; loadMessages(dmId); }
 
 function sendMessage(){
     var targetId=(currentMode==="guild")?selectedChannel:selectedDM; if(!targetId) return alert("Select a channel or DM first");
     var content=document.getElementById("msgInput").value||"";
     if(fileList.length>0){
-        var form=new FormData();
-        for(var i=0;i<fileList.length;i++) form.append("file",fileList[i],fileList[i].name);
-        if(content) form.append("content",content);
+        var form=new FormData(); for(var i=0;i<fileList.length;i++) form.append("file",fileList[i],fileList[i].name); if(content) form.append("content",content);
         proxyFetch("channels/"+targetId+"/messages","POST",form,function(){ document.getElementById("msgInput").value=""; clearFileSelection(); loadMessages(targetId); },true);
     } else if(content){ proxyFetch("channels/"+targetId+"/messages","POST",{content:content},function(){ document.getElementById("msgInput").value=""; loadMessages(targetId); }); }
 }
@@ -174,6 +171,7 @@ function showProfile(userId,event){
 }
 document.addEventListener("click",function(e){ if(!e.target.closest(".message b")) document.getElementById("profilePreview").style.display="none"; });
 
+// auto-refresh messages every 5s
 setInterval(function(){ var target=(currentMode==="guild")?selectedChannel:selectedDM; if(target) loadMessages(target); },5000);
 
 loadGuilds();
