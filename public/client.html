@@ -1,234 +1,316 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Discord Mobile Client</title>
+    <meta charset="utf-8">
+    <title>Discord Mobile Client — Multi-file + Drag & Drop</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        body { margin:0; padding:0; font-family:sans-serif; background:#181818; color:#eee; overflow:hidden; }
+        /* Basic theme compatible with old Safari */
+        body { margin:0; padding:0; font-family:sans-serif; background:#181818; color:#eee; -webkit-text-size-adjust:100%; }
         #container { display:flex; height:100vh; width:100vw; }
-
-        /* Servers Panel */
-        #servers { width:50px; background:#202020; overflow-y:auto; display:flex; flex-direction:column; align-items:center; border-right:1px solid #444; scrollbar-width:none; -ms-overflow-style:none; }
-        #servers::-webkit-scrollbar { display:none; }
-        .server-avatar { width:40px; height:40px; border-radius:50%; margin:5px 0; cursor:pointer; border:2px solid transparent; }
-        .server-avatar.selected { border:2px solid #7289da; }
-
-        /* Channels / DM List */
-        #channels { width:120px; background:#2c2c2c; overflow-y:auto; border-right:1px solid #444; scrollbar-width:none; -ms-overflow-style:none; }
-        #channels::-webkit-scrollbar { display:none; }
-        button.channel { width:100%; padding:5px; margin:2px 0; background:#333; color:#eee; border:none; border-radius:3px; text-align:left; cursor:pointer; }
-        button.channel.selected { background:#444; }
-
-        /* Chat Panel */
+        #servers { width:60px; background:#202020; display:flex; flex-direction:column; align-items:center; border-right:1px solid #444; overflow:auto; }
+        #channels { width:120px; background:#2c2c2c; overflow:auto; border-right:1px solid #444; }
         #chat-container { flex:1; display:flex; flex-direction:column; background:#1e1e1e; }
-        #messages { flex:1; overflow-y:auto; padding:10px; scrollbar-width:none; -ms-overflow-style:none; }
-        #messages::-webkit-scrollbar { display:none; }
-        .message { margin:5px 0; padding:5px; background:linear-gradient(145deg,#2e2e2e,#3a3a3a); border-radius:5px; }
-        .message img { max-width:150px; max-height:150px; display:block; margin-top:5px; border-radius:3px; }
-        .message b { cursor:pointer; color:#ffd700; }
 
-        /* Message Input */
-        #msgInputContainer { display:flex; padding:5px; border-top:1px solid #444; }
-        #msgInput { flex:1; padding:5px; border-radius:3px; border:1px solid #555; background:#2c2c2c; color:#eee; font-size:14px; }
-        #msgFile { margin-left:5px; }
-        #msgSend { margin-left:5px; padding:5px 10px; border:none; border-radius:3px; background:#7289da; color:#fff; cursor:pointer; }
+        #messages { flex:1; overflow-y:auto; padding:10px; -webkit-overflow-scrolling: touch; }
+        .message { margin:6px 0; padding:8px; background:#2e2e2e; border-radius:6px; }
+        .message img, .message video { display:block; margin-top:6px; max-width:220px; max-height:220px; border-radius:4px; }
 
-        /* Profile Preview */
-        #profilePreview { position:absolute; background:#2a2a2a; border:1px solid #555; border-radius:5px; padding:5px; display:none; z-index:1000; }
+        /* Input area */
+        #msgInputContainer { display:flex; align-items:center; padding:6px; border-top:1px solid #444; background:#171717; }
+        #msgInput { flex:1; padding:8px; border-radius:6px; border:1px solid #444; background:#222; color:#eee; font-size:15px; }
+        #fileBtn, #msgSend { margin-left:6px; padding:8px 10px; border-radius:6px; border:none; cursor:pointer; }
+        #fileBtn { background:#2d2d2d; color:#ddd; }
+        #msgSend { background:#7289da; color:#fff; }
 
-        /* Settings Panel */
-        #settingsPanel { position:absolute; top:50px; left:50%; transform:translateX(-50%); background:#2a2a2a; border:1px solid #555; border-radius:5px; padding:10px; display:none; width:250px; z-index:1000; }
-        #settingsPanel button { display:block; width:100%; margin:5px 0; padding:5px; border:none; border-radius:3px; background:#444; color:#eee; cursor:pointer; }
+        /* Preview area for selected files */
+        #filePreview { display:flex; flex-wrap:wrap; padding:8px; background:#161616; border-top:1px solid #333; max-height:140px; overflow:auto; }
+        .previewItem { width:90px; height:90px; margin:6px; position:relative; border-radius:6px; overflow:hidden; background:#111; display:flex; align-items:center; justify-content:center; }
+        .previewItem img, .previewItem video { max-width:100%; max-height:100%; display:block; }
+        .removeFileBtn { position:absolute; top:4px; right:4px; background:rgba(0,0,0,0.6); color:#fff; border:none; padding:2px 5px; font-size:12px; border-radius:3px; cursor:pointer; }
+
+        /* Drag & drop overlay */
+        #dropOverlay { position:absolute; left:0; top:0; width:100%; height:100%; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.5); z-index:1000; color:#fff; font-size:20px; }
+
+        /* simple responsive */
+        @media (max-width:420px) {
+            .message img, .message video { max-width:150px; max-height:150px; }
+            .previewItem { width:70px; height:70px; }
+        }
     </style>
 </head>
 <body>
 <div id="container">
     <div id="servers">
-        <img src="logo.png" id="logoBtn" style="width:40px;height:40px;margin:5px;cursor:pointer;">
+        <img src="logo.png" id="logoBtn" style="width:42px;height:42px;margin:8px;cursor:pointer;">
+        <!-- server icons injected here -->
     </div>
+
     <div id="channels"></div>
+
     <div id="chat-container">
         <div id="messages"></div>
+
+        <!-- preview area -->
+        <div id="filePreview" aria-hidden="false"></div>
+
+        <!-- input and controls -->
         <div id="msgInputContainer">
             <input type="text" id="msgInput" placeholder="Write a message">
-            <input type="file" id="msgFile">
+            <input type="file" id="fileInput" multiple style="display:none">
+            <button id="fileBtn">📎</button>
             <button id="msgSend">Send</button>
         </div>
     </div>
 </div>
 
-<div id="profilePreview"></div>
-
-<div id="settingsPanel">
-    <button id="closeSettings">Close Settings</button>
-    <button id="logoutBtn">Logout</button>
-    <button id="toggleDMsBtn">Switch to DMs</button>
-    <button id="dummySetting1">Setting 1</button>
-    <button id="dummySetting2">Setting 2</button>
-</div>
+<div id="profilePreview" style="display:none; position:absolute; z-index:1200; background:#222; border:1px solid #444; padding:8px; border-radius:6px;"></div>
+<div id="dropOverlay">Drop files to upload</div>
 
 <script>
+/* ===============================
+   Configuration & state
+   =============================== */
 var token = localStorage.getItem("botToken");
-if(!token) window.location.href="login.html";
+if(!token) { window.location.href="login.html"; }
 
+var currentMode = "guild"; // guild or dm
 var selectedGuild = null;
 var selectedChannel = null;
 var selectedDM = null;
-var guildChannels = {};
-var currentMode = "guild"; // "guild" = server, "dm" = DMs
-var previewDiv = document.getElementById("profilePreview");
-var settingsPanel = document.getElementById("settingsPanel");
+var fileList = []; // array of File objects
+var previewContainer = document.getElementById("filePreview");
+var dropOverlay = document.getElementById("dropOverlay");
 
-// --------------------- PROXY FETCH ---------------------
-function proxyFetch(path, method, body, callback, isForm=false){
+/* ===============================
+   Helper: proxyFetch for XHR
+   - isForm true -> sends FormData without Content-Type header
+   - compatible with iOS10 XMLHttpRequest
+   =============================== */
+function proxyFetch(path, method, body, callback, isForm) {
     var xhr = new XMLHttpRequest();
-    xhr.open(method, "/proxy/"+path, true);
+    xhr.open(method, "/proxy/" + path, true);
     xhr.setRequestHeader("Authorization", token);
     if(!isForm) xhr.setRequestHeader("Content-Type", "application/json");
     xhr.onreadystatechange = function(){
-        if(xhr.readyState===4){
-            try { callback(JSON.parse(xhr.responseText)); }
-            catch(e){ callback(xhr.responseText); }
+        if(xhr.readyState === 4) {
+            var text = xhr.responseText;
+            try { callback(JSON.parse(text)); }
+            catch(e){ callback(text); }
         }
     };
     xhr.send(body ? (isForm ? body : JSON.stringify(body)) : null);
 }
 
-// --------------------- LOAD GUILDS ---------------------
+/* ===============================
+   FILE SELECT / DRAG & DROP LOGIC
+   - supports multi files
+   - shows previews (image, gif, video)
+   - remove individual files
+   - clears selection after send
+   =============================== */
+
+var fileInput = document.getElementById("fileInput");
+var fileBtn = document.getElementById("fileBtn");
+
+// Click paperclip opens file chooser
+fileBtn.addEventListener("click", function(){ fileInput.click(); });
+
+// When files chosen via dialog
+fileInput.addEventListener("change", function(e){
+    var files = e.target.files;
+    if(!files) return;
+    for(var i=0;i<files.length;i++) addFile(files[i]);
+    // keep the input value — we'll clear it after send
+    fileInput.value = "";
+    renderPreview();
+});
+
+// Drag & drop handling on whole window
+function showDropOverlay(show){
+    dropOverlay.style.display = show ? "flex" : "none";
+}
+document.addEventListener("dragenter", function(e){ e.preventDefault(); showDropOverlay(true); });
+document.addEventListener("dragover", function(e){ e.preventDefault(); });
+document.addEventListener("dragleave", function(e){
+    // hide when leaving window
+    showDropOverlay(false);
+});
+document.addEventListener("drop", function(e){
+    e.preventDefault();
+    showDropOverlay(false);
+    var dt = e.dataTransfer;
+    if(dt && dt.files && dt.files.length){
+        for(var i=0;i<dt.files.length;i++) addFile(dt.files[i]);
+        renderPreview();
+    }
+});
+
+// helpers
+function addFile(file){
+    // basic size limit check (optional) — Discord max 8MB (or Nitro bigger). We'll not enforce here.
+    fileList.push(file);
+}
+function removeFileAt(index){
+    if(index<0 || index>=fileList.length) return;
+    fileList.splice(index,1);
+    renderPreview();
+}
+function clearFileSelection(){
+    fileList = [];
+    renderPreview();
+}
+
+// render preview UI
+function renderPreview(){
+    previewContainer.innerHTML = "";
+    for(var i=0;i<fileList.length;i++){
+        var f = fileList[i];
+        var item = document.createElement("div");
+        item.className = "previewItem";
+
+        // remove button
+        var rem = document.createElement("button");
+        rem.className = "removeFileBtn";
+        rem.textContent = "✕";
+        (function(idx){
+            rem.addEventListener("click", function(e){ e.stopPropagation(); removeFileAt(idx); });
+        })(i);
+        item.appendChild(rem);
+
+        // preview content
+        var type = f.type || "";
+        if(type.indexOf("image/") === 0) {
+            // image or gif
+            var img = document.createElement("img");
+            img.src = URL.createObjectURL(f);
+            img.onload = function(){ URL.revokeObjectURL(this.src); };
+            item.appendChild(img);
+        } else if(type.indexOf("video/") === 0) {
+            var vid = document.createElement("video");
+            vid.controls = true;
+            vid.src = URL.createObjectURL(f);
+            vid.style.maxWidth = "100%";
+            vid.onload = function(){ URL.revokeObjectURL(this.src); };
+            item.appendChild(vid);
+        } else {
+            // generic file icon + name
+            var span = document.createElement("div");
+            span.style.padding = "6px";
+            span.style.fontSize = "12px";
+            span.style.textAlign = "center";
+            span.textContent = f.name;
+            item.appendChild(span);
+        }
+
+        previewContainer.appendChild(item);
+    }
+}
+
+/* ===============================
+   Messages / Guild / DM logic
+   (kept simple — reuse your current endpoints)
+   =============================== */
+
 function loadGuilds(){
     proxyFetch("users/@me/guilds","GET",null,function(guilds){
-        var html="";
-        html+='<img src="logo.png" id="logoBtn" style="width:40px;height:40px;margin:5px;cursor:pointer;">'; // top logo
+        var root = document.getElementById("servers");
+        var html = '<img src="logo.png" id="logoBtn" style="width:42px;height:42px;margin:8px;cursor:pointer;">';
         for(var i=0;i<guilds.length;i++){
-            var g=guilds[i];
-            var avatarUrl = g.icon ? "https://cdn.discordapp.com/icons/"+g.id+"/"+g.icon+".png" : "default.png";
-            html += '<img class="server-avatar" id="guild_'+g.id+'" src="'+avatarUrl+'" onclick="selectGuild(\''+g.id+'\')">';
+            var g = guilds[i];
+            var avatar = g.icon ? "https://cdn.discordapp.com/icons/"+g.id+"/"+g.icon+".png" : "default.png";
+            html += '<img class="server-avatar" id="guild_'+g.id+'" src="'+avatar+'" style="width:40px;height:40px;border-radius:50%;margin:6px;cursor:pointer;border:2px solid transparent" onclick="selectGuild(\\''+g.id+'\\')">';
         }
-        document.getElementById("servers").innerHTML = html;
-        document.getElementById("logoBtn").addEventListener("click", toggleDMs);
+        root.innerHTML = html;
+        // attach logo btn listener safely
+        var logo = document.getElementById("logoBtn");
+        if(logo) logo.addEventListener("click", toggleDMs);
+        // pick first guild if exists
         if(guilds.length>0) selectGuild(guilds[0].id);
     });
 }
 
-// --------------------- GUILD & CHANNELS ---------------------
 function selectGuild(guildId){
     selectedGuild = guildId;
-    currentMode="guild";
-    var avatars = document.getElementsByClassName("server-avatar");
-    for(var i=0;i<avatars.length;i++){ avatars[i].className="server-avatar"; }
-    document.getElementById("guild_"+guildId).className="server-avatar selected";
+    currentMode = "guild";
     loadChannels(guildId);
 }
 
 function loadChannels(guildId){
     proxyFetch("guilds/"+guildId+"/channels","GET",null,function(channels){
-        var html="";
+        var html = "";
         if(channels && channels.length){
-            guildChannels[guildId]=channels;
             for(var i=0;i<channels.length;i++){
-                var c=channels[i];
-                if(c.type===0){
-                    html+='<button class="channel" onclick="selectChannel(\''+c.id+'\', this)">'+c.name+'</button>';
-                }
+                var c = channels[i];
+                if(c.type===0) html += '<button class="channel" onclick="selectChannel(\\''+c.id+'\\', this)">'+escapeHtml(c.name)+'</button>';
             }
-        } else html="<i>No access or no channels</i>";
-        document.getElementById("channels").innerHTML=html;
-        if(channels && channels.length>0) selectChannel(channels[0].id, document.getElementsByClassName("channel")[0]);
+        } else html = "<i style='padding:8px;display:block;color:#bbb'>No access or channels</i>";
+        document.getElementById("channels").innerHTML = html;
+        // auto-select first channel
+        var btns = document.getElementsByClassName("channel");
+        if(btns && btns.length) selectChannel(btns[0].getAttribute("onclick").match(/'([^']+)'/)[1], btns[0]);
     });
 }
 
 function selectChannel(channelId, btn){
     selectedChannel = channelId;
     selectedDM = null;
-    var buttons = document.getElementsByClassName("channel");
-    for(var i=0;i<buttons.length;i++){ buttons[i].className="channel"; }
-    if(btn) btn.className="channel selected";
+    // mark selected
+    var btns = document.getElementsByClassName("channel");
+    for(var i=0;i<btns.length;i++) btns[i].className = "channel";
+    if(btn) btn.className = "channel selected";
     loadMessages(channelId);
 }
 
-// --------------------- LOAD MESSAGES ---------------------
 function loadMessages(channelId){
     if(!channelId) return;
-    proxyFetch("channels/"+channelId+"/messages?limit=20","GET",null,function(msgs){
-        var html="";
+    proxyFetch("channels/"+channelId+"/messages?limit=25","GET",null,function(msgs){
+        var out = "";
+        if(!msgs || !msgs.length) { document.getElementById("messages").innerHTML = "<i style='color:#bbb'>No messages</i>"; return; }
         for(var i=msgs.length-1;i>=0;i--){
-            var m=msgs[i];
-            html+='<div class="message">';
-            if(m.author.avatar){
-                html+='<img src="https://cdn.discordapp.com/avatars/'+m.author.id+'/'+m.author.avatar+'.png" style="width:30px;height:30px;border-radius:50%;margin-right:5px;vertical-align:middle;">';
-            }
-            html+='<b onclick="showProfile(\''+m.author.id+'\', event)">'+m.author.username+'</b>: '+m.content+'<br>';
+            var m = msgs[i];
+            out += '<div class="message">';
+            out += '<b onclick="showProfile(\\''+m.author.id+'\\', event)">'+escapeHtml(m.author.username)+'</b>: '+escapeHtml(m.content || "") + '<br>';
             if(m.attachments && m.attachments.length){
                 for(var j=0;j<m.attachments.length;j++){
-                    html+='<img src="'+m.attachments[j].url+'">';
+                    var a = m.attachments[j];
+                    // show images/gifs and video types inline
+                    var url = a.url || a.proxy_url || a.filename;
+                    var filename = a.filename || "";
+                    if(a.height && a.width && /\.(mp4|webm|mov)$/i.test(filename)){
+                        out += '<video controls src="'+url+'"></video>';
+                    } else if(a.content_type && a.content_type.indexOf("video/")===0){
+                        out += '<video controls src="'+url+'"></video>';
+                    } else {
+                        out += '<img src="'+url+'">';
+                    }
                 }
             }
-            html+='</div>';
+            out += '</div>';
         }
-        var msgDiv=document.getElementById("messages");
-        msgDiv.innerHTML=html;
-        msgDiv.scrollTop=msgDiv.scrollHeight;
+        var mdiv = document.getElementById("messages");
+        mdiv.innerHTML = out;
+        mdiv.scrollTop = mdiv.scrollHeight;
     });
 }
 
-// --------------------- SEND MESSAGE ---------------------
-function sendMessage(){
-    if(currentMode==="guild" && !selectedChannel) return alert("Select a channel first");
-    if(currentMode==="dm" && !selectedDM) return alert("Select a DM first");
-    var content = document.getElementById("msgInput").value;
-    var fileInput = document.getElementById("msgFile");
-    var targetId = currentMode==="guild" ? selectedChannel : selectedDM;
-
-    if(fileInput.files.length>0){
-        var form = new FormData();
-        form.append("file", fileInput.files[0]);
-        if(content) form.append("content", content);
-        proxyFetch("channels/"+targetId+"/messages","POST",form,true,function(){ fileInput.value=""; loadMessages(targetId); });
-        document.getElementById("msgInput").value="";
-    } else if(content){
-        proxyFetch("channels/"+targetId+"/messages","POST",{content:content},function(){
-            document.getElementById("msgInput").value="";
-            loadMessages(targetId);
-        });
-    }
-}
-
-document.getElementById("msgSend").addEventListener("click", sendMessage);
-document.getElementById("msgInput").addEventListener("keypress", function(e){ if(e.keyCode===13) sendMessage(); });
-
-// --------------------- PROFILE PREVIEW ---------------------
-function showProfile(userId, event){
-    proxyFetch("users/"+userId,"GET",null,function(user){
-        previewDiv.style.display="block";
-        previewDiv.style.left=(event.clientX+10)+"px";
-        previewDiv.style.top=(event.clientY+10)+"px";
-        previewDiv.innerHTML = "<b>"+user.username+"#"+user.discriminator+"</b><br>"+
-            "<img src='https://cdn.discordapp.com/avatars/"+user.id+"/"+user.avatar+".png' style='width:80px;height:80px;'><br>ID: "+user.id;
-    });
-}
-document.addEventListener("click", function(e){ if(!e.target.closest(".message b")) previewDiv.style.display="none"; });
-
-// --------------------- DM / GROUP CHAT ---------------------
 function toggleDMs(){
-    if(currentMode==="guild"){
-        currentMode="dm";
+    if(currentMode === "guild") {
+        currentMode = "dm";
         loadDMs();
-    } else if(selectedGuild){
-        currentMode="guild";
-        loadChannels(selectedGuild);
+    } else {
+        currentMode = "guild";
+        if(selectedGuild) loadChannels(selectedGuild);
     }
 }
 
 function loadDMs(){
     proxyFetch("users/@me/channels","GET",null,function(channels){
-        var html="";
+        var html = "";
         for(var i=0;i<channels.length;i++){
             var c = channels[i];
-            var name = "";
-            if(c.type===1){ name = c.recipients[0].username; }
-            else if(c.type===3){ name = c.name || "Group Chat"; }
-            else continue;
-            html+='<button class="channel" onclick="selectDM(\''+c.id+'\', this)">'+name+'</button>';
+            var name = (c.type === 1 && c.recipients && c.recipients[0]) ? c.recipients[0].username : (c.name || "Group");
+            html += '<button class="channel" onclick="selectDM(\\''+c.id+'\\', this)">'+escapeHtml(name)+'</button>';
         }
         document.getElementById("channels").innerHTML = html;
     });
@@ -237,28 +319,88 @@ function loadDMs(){
 function selectDM(dmId, btn){
     selectedDM = dmId;
     selectedChannel = null;
-    var buttons = document.getElementsByClassName("channel");
-    for(var i=0;i<buttons.length;i++){ buttons[i].className="channel"; }
-    if(btn) btn.className="channel selected";
+    var btns = document.getElementsByClassName("channel");
+    for(var i=0;i<btns.length;i++) btns[i].className = "channel";
+    if(btn) btn.className = "channel selected";
     loadMessages(dmId);
 }
 
-// --------------------- SETTINGS ---------------------
-document.getElementById("closeSettings").addEventListener("click", function(){ settingsPanel.style.display="none"; });
-document.getElementById("logoutBtn").addEventListener("click", function(){ localStorage.removeItem("botToken"); window.location.href="login.html"; });
+/* ===============================
+   SEND MESSAGE with multi-file support
+   - appends each file as 'file' field
+   - appends content if present
+   - uses proxyFetch with isForm=true
+   - after successful send clears fileList and previews
+   =============================== */
+function sendMessage(){
+    var targetId = (currentMode === "guild") ? selectedChannel : selectedDM;
+    if(!targetId) return alert("Select a channel or DM first");
 
-// Open settings with right-click on logo
-document.getElementById("logoBtn").addEventListener("contextmenu", function(e){
-    e.preventDefault();
-    settingsPanel.style.display="block";
-});
+    var content = document.getElementById("msgInput").value || "";
 
-// --------------------- REFRESH MESSAGES ---------------------
-setInterval(function(){ 
-    if(currentMode==="guild" && selectedChannel) loadMessages(selectedChannel); 
-    if(currentMode==="dm" && selectedDM) loadMessages(selectedDM);
-},5000);
+    // If there are files to upload
+    if(fileList.length > 0){
+        var form = new FormData();
+        // append files
+        for(var i=0;i<fileList.length;i++){
+            // Discord accepts multiple file fields with same name "file"
+            form.append("file", fileList[i], fileList[i].name);
+        }
+        if(content) form.append("content", content);
 
+        // send via XHR through our proxy
+        proxyFetch("channels/"+targetId+"/messages", "POST", form, function(res){
+            // response res may be JSON or text
+            document.getElementById("msgInput").value = "";
+            clearFileSelection();
+            loadMessages(targetId);
+        }, true);
+    } else if(content){
+        proxyFetch("channels/"+targetId+"/messages", "POST", {content: content}, function(){
+            document.getElementById("msgInput").value = "";
+            loadMessages(targetId);
+        });
+    }
+}
+
+// UI bindings
+document.getElementById("msgSend").addEventListener("click", function(){ sendMessage(); });
+document.getElementById("msgInput").addEventListener("keypress", function(e){ if(e.keyCode === 13) sendMessage(); });
+
+// profile preview (simple)
+function showProfile(userId, event){
+    proxyFetch("users/"+userId,"GET",null,function(user){
+        var div = document.getElementById("profilePreview");
+        div.style.left = (event.clientX + 8) + "px";
+        div.style.top = (event.clientY + 8) + "px";
+        div.style.display = "block";
+        var html = "<b>" + escapeHtml(user.username || "Unknown") + (user.discriminator ? ("#"+user.discriminator) : "") + "</b><br>";
+        if(user.avatar) html += '<img src="https://cdn.discordapp.com/avatars/'+user.id+'/'+user.avatar+'.png" style="width:80px;height:80px;border-radius:6px;"><br>';
+        html += "ID: " + (user.id || "");
+        div.innerHTML = html;
+    });
+}
+document.addEventListener("click", function(e){ if(!e.target.closest(".message b")) document.getElementById("profilePreview").style.display = "none"; });
+
+/* ===============================
+   Utilities
+   =============================== */
+function escapeHtml(s){
+    if(!s) return "";
+    return String(s).replace(/[&<>"']/g, function(m){ return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]; });
+}
+
+/* ===============================
+   Periodic refresh
+   =============================== */
+setInterval(function(){
+    var target = (currentMode==="guild") ? selectedChannel : selectedDM;
+    if(target) loadMessages(target);
+}, 5000);
+
+/* ===============================
+   Start
+   =============================== */
 loadGuilds();
 </script>
 </body>
