@@ -1,43 +1,46 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="utf-8">
-<title>Discord Mobile Client — Multi-file + Drag & Drop</title>
+<meta charset="UTF-8">
+<title>Discord iOS 10 Mobile Client</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-    /* === UI Layout from your original design === */
-    body { margin:0; padding:0; font-family:sans-serif; background:#181818; color:#eee; -webkit-text-size-adjust:100%; }
-    #container { display:flex; height:100vh; width:100vw; }
-    #servers { width:60px; background:#202020; display:flex; flex-direction:column; align-items:center; border-right:1px solid #444; overflow:auto; }
-    #channels { width:120px; background:#2c2c2c; overflow:auto; border-right:1px solid #444; }
-    #chat-container { flex:1; display:flex; flex-direction:column; background:#1e1e1e; }
-    #messages { flex:1; overflow-y:auto; padding:10px; -webkit-overflow-scrolling: touch; }
-    .message { margin:6px 0; padding:8px; background:#2e2e2e; border-radius:6px; }
-    .message img, .message video { display:block; margin-top:6px; max-width:220px; max-height:220px; border-radius:4px; }
-    #msgInputContainer { display:flex; align-items:center; padding:6px; border-top:1px solid #444; background:#171717; }
-    #msgInput { flex:1; padding:8px; border-radius:6px; border:1px solid #444; background:#222; color:#eee; font-size:15px; }
-    #fileBtn, #msgSend { margin-left:6px; padding:8px 10px; border-radius:6px; border:none; cursor:pointer; }
-    #fileBtn { background:#2d2d2d; color:#ddd; }
-    #msgSend { background:#7289da; color:#fff; }
-    #filePreview { display:flex; flex-wrap:wrap; padding:8px; background:#161616; border-top:1px solid #333; max-height:140px; overflow:auto; }
-    .previewItem { width:90px; height:90px; margin:6px; position:relative; border-radius:6px; overflow:hidden; background:#111; display:flex; align-items:center; justify-content:center; }
-    .previewItem img, .previewItem video { max-width:100%; max-height:100%; display:block; }
-    .removeFileBtn { position:absolute; top:4px; right:4px; background:rgba(0,0,0,0.6); color:#fff; border:none; padding:2px 5px; font-size:12px; border-radius:3px; cursor:pointer; }
-    #dropOverlay { position:absolute; left:0; top:0; width:100%; height:100%; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.5); z-index:1000; color:#fff; font-size:20px; }
-    #servers img.server-avatar.selected { border-color:#7289da; }
-    .channel.selected { background:#3b3b3b; }
-    @media (max-width:420px) { .message img, .message video { max-width:150px; max-height:150px; } .previewItem { width:70px; height:70px; } }
+/* ==== Classic iOS 10 Discord UI ==== */
+body {margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#181818;color:#eee;-webkit-text-size-adjust:100%;overflow:hidden;}
+#container{display:flex;height:100vh;width:100vw;}
+#servers{width:60px;background:#202020;display:flex;flex-direction:column;align-items:center;border-right:1px solid #444;overflow-y:auto;padding-top:8px;}
+#servers img.server-avatar{width:42px;height:42px;border-radius:50%;margin:6px 0;cursor:pointer;border:2px solid transparent;transition:0.2s;}
+#servers img.server-avatar.selected{border-color:#7289da;}
+#channels{width:130px;background:#2c2c2c;overflow-y:auto;border-right:1px solid #444;display:flex;flex-direction:column;}
+.channel{padding:6px 10px;text-align:left;background:none;border:none;color:#eee;cursor:pointer;font-size:14px;border-radius:4px;margin:2px 4px;text-overflow:ellipsis;overflow:hidden;white-space:nowrap;}
+.channel.selected{background:#3b3b3b;}
+#chat-container{flex:1;display:flex;flex-direction:column;background:#1e1e1e;}
+#messages{flex:1;overflow-y:auto;padding:10px;-webkit-overflow-scrolling:touch;}
+.message{margin:6px 0;padding:8px;background:#2e2e2e;border-radius:6px;}
+.message img,.message video{display:block;margin-top:6px;max-width:220px;max-height:220px;border-radius:4px;}
+#msgInputContainer{display:flex;align-items:center;padding:6px;border-top:1px solid #444;background:#171717;}
+#msgInput{flex:1;padding:8px;border-radius:6px;border:1px solid #444;background:#222;color:#eee;font-size:15px;}
+#fileBtn,#msgSend{margin-left:6px;padding:8px 10px;border-radius:6px;border:none;cursor:pointer;}
+#fileBtn{background:#2d2d2d;color:#ddd;}
+#msgSend{background:#7289da;color:#fff;}
+#filePreview{display:flex;flex-wrap:wrap;padding:8px;background:#161616;border-top:1px solid #333;max-height:140px;overflow-y:auto;}
+.previewItem{width:90px;height:90px;margin:6px;position:relative;border-radius:6px;overflow:hidden;background:#111;display:flex;align-items:center;justify-content:center;}
+.previewItem img,.previewItem video{max-width:100%;max-height:100%;}
+.removeFileBtn{position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.6);color:#fff;border:none;padding:2px 5px;font-size:12px;border-radius:3px;cursor:pointer;}
+#dropOverlay{position:absolute;left:0;top:0;width:100%;height:100%;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.5);z-index:1000;color:#fff;font-size:20px;}
+#profilePreview{display:none;position:absolute;z-index:1200;background:#222;border:1px solid #444;padding:8px;border-radius:6px;}
+@media(max-width:420px){.message img,.message video{max-width:150px;max-height:150px;}.previewItem{width:70px;height:70px;}#channels{width:100px;}}
 </style>
 </head>
 <body>
 <div id="container">
     <div id="servers">
-        <img src="logo.png" id="logoBtn" style="width:42px;height:42px;margin:8px;cursor:pointer;">
+        <img src="logo.png" id="logoBtn" style="width:42px;height:42px;margin-bottom:8px;cursor:pointer;">
     </div>
     <div id="channels"></div>
     <div id="chat-container">
         <div id="messages"></div>
-        <div id="filePreview" aria-hidden="false"></div>
+        <div id="filePreview"></div>
         <div id="msgInputContainer">
             <input type="text" id="msgInput" placeholder="Write a message">
             <input type="file" id="fileInput" multiple style="display:none">
@@ -46,134 +49,84 @@
         </div>
     </div>
 </div>
-<div id="profilePreview" style="display:none; position:absolute; z-index:1200; background:#222; border:1px solid #444; padding:8px; border-radius:6px;"></div>
 <div id="dropOverlay">Drop files to upload</div>
+<div id="profilePreview"></div>
 
 <script>
-var token = localStorage.getItem("botToken");
-if(!token){ window.location.href="login.html"; }
+var token = localStorage.getItem("botToken"); if(!token){ window.location.href="login.html"; }
+var currentMode="guild",selectedGuild=null,selectedChannel=null,selectedDM=null,fileList=[];
+var previewContainer=document.getElementById("filePreview"),dropOverlay=document.getElementById("dropOverlay");
 
-var currentMode="guild", selectedGuild=null, selectedChannel=null, selectedDM=null, fileList=[];
-var previewContainer=document.getElementById("filePreview");
-var dropOverlay=document.getElementById("dropOverlay");
-
-// === proxyFetch helper (XHR) ===
-function proxyFetch(path, method, body, callback, isForm){
+function proxyFetch(path,method,body,callback,isForm){
     var xhr=new XMLHttpRequest();
     xhr.open(method,"/proxy/"+path,true);
     xhr.setRequestHeader("Authorization",token);
-    if(!isForm) xhr.setRequestHeader("Content-Type","application/json");
-    xhr.onreadystatechange=function(){
-        if(xhr.readyState===4){
-            var text=xhr.responseText;
-            try{ callback(JSON.parse(text)); }catch(e){ callback(text); }
-        }
-    };
-    xhr.send(body?(isForm?body:JSON.stringify(body)):null);
+    if(!isForm)xhr.setRequestHeader("Content-Type","application/json");
+    xhr.onreadystatechange=function(){if(xhr.readyState===4){var text=xhr.responseText;try{callback(JSON.parse(text))}catch(e){callback(text)}}};
+    xhr.send(body?isForm?body:JSON.stringify(body):null);
 }
 
-// === File selection / Drag & Drop ===
-var fileInput=document.getElementById("fileInput"), fileBtn=document.getElementById("fileBtn");
-fileBtn.addEventListener("click",()=>fileInput.click());
-fileInput.addEventListener("change",function(e){ var files=e.target.files; if(files){ for(var i=0;i<files.length;i++) addFile(files[i]); fileInput.value=""; renderPreview(); } });
-function showDropOverlay(show){ dropOverlay.style.display=show?"flex":"none"; }
-document.addEventListener("dragenter",function(e){ e.preventDefault(); showDropOverlay(true); });
-document.addEventListener("dragover",function(e){ e.preventDefault(); });
-document.addEventListener("dragleave",function(e){ showDropOverlay(false); });
-document.addEventListener("drop",function(e){ e.preventDefault(); showDropOverlay(false); var dt=e.dataTransfer; if(dt && dt.files){ for(var i=0;i<dt.files.length;i++) addFile(dt.files[i]); renderPreview(); } });
-function addFile(file){ fileList.push(file); }
-function removeFileAt(index){ if(index>=0 && index<fileList.length){ fileList.splice(index,1); renderPreview(); } }
-function clearFileSelection(){ fileList=[]; renderPreview(); }
-function renderPreview(){
-    previewContainer.innerHTML="";
-    for(var i=0;i<fileList.length;i++){
-        var f=fileList[i], item=document.createElement("div"); item.className="previewItem";
-        var rem=document.createElement("button"); rem.className="removeFileBtn"; rem.textContent="✕";
-        (function(idx){ rem.addEventListener("click",function(e){ e.stopPropagation(); removeFileAt(idx); }); })(i);
-        item.appendChild(rem);
-        var type=f.type||"";
-        if(type.indexOf("image/")===0){ var img=document.createElement("img"); img.src=URL.createObjectURL(f); img.onload=function(){ URL.revokeObjectURL(this.src); }; item.appendChild(img); }
-        else if(type.indexOf("video/")===0){ var vid=document.createElement("video"); vid.controls=true; vid.src=URL.createObjectURL(f); item.appendChild(vid); }
-        else{ var span=document.createElement("div"); span.style.padding="6px"; span.style.fontSize="12px"; span.style.textAlign="center"; span.textContent=f.name; item.appendChild(span); }
-        previewContainer.appendChild(item);
-    }
-}
+/* FILE + DRAG & DROP */
+var fileInput=document.getElementById("fileInput"),fileBtn=document.getElementById("fileBtn");
+fileBtn.addEventListener("click",function(){fileInput.click();});
+fileInput.addEventListener("change",function(e){var files=e.target.files;if(!files)return;for(var i=0;i<files.length;i++)addFile(files[i]);fileInput.value="";renderPreview();});
+function showDropOverlay(show){dropOverlay.style.display=show?"flex":"none";}
+document.addEventListener("dragenter",function(e){e.preventDefault();showDropOverlay(true);});
+document.addEventListener("dragover",function(e){e.preventDefault();});
+document.addEventListener("dragleave",function(e){showDropOverlay(false);});
+document.addEventListener("drop",function(e){e.preventDefault();showDropOverlay(false);var dt=e.dataTransfer;if(dt&&dt.files&&dt.files.length){for(var i=0;i<dt.files.length;i++)addFile(dt.files[i]);renderPreview();}});
+function addFile(f){fileList.push(f);}
+function removeFileAt(idx){fileList.splice(idx,1);renderPreview();}
+function clearFileSelection(){fileList=[];renderPreview();}
+function renderPreview(){previewContainer.innerHTML="";for(var i=0;i<fileList.length;i++){var f=fileList[i];var item=document.createElement("div");item.className="previewItem";var rem=document.createElement("button");rem.className="removeFileBtn";rem.textContent="✕";(function(idx){rem.addEventListener("click",function(e){e.stopPropagation();removeFileAt(idx);});})(i);item.appendChild(rem);var type=f.type||"";if(type.indexOf("image/")===0){var img=document.createElement("img");img.src=URL.createObjectURL(f);img.onload=function(){URL.revokeObjectURL(this.src);};item.appendChild(img);}else if(type.indexOf("video/")===0){var vid=document.createElement("video");vid.controls=true;vid.src=URL.createObjectURL(f);vid.style.maxWidth="100%";vid.onload=function(){URL.revokeObjectURL(this.src);};item.appendChild(vid);}else{var span=document.createElement("div");span.style.padding="6px";span.style.fontSize="12px";span.style.textAlign="center";span.textContent=f.name;item.appendChild(span);}previewContainer.appendChild(item);}}
 
-// === Guilds / Channels / DMs logic ===
-function escapeHtml(s){ if(!s)return""; return String(s).replace(/[&<>"']/g,function(m){ return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]; }); }
+/* LOAD GUILDS / CHANNELS / DMS */
 function loadGuilds(){
     proxyFetch("users/@me/guilds","GET",null,function(guilds){
         var root=document.getElementById("servers");
-        var html='<img src="logo.png" id="logoBtn" style="width:42px;height:42px;margin:8px;cursor:pointer;">';
-        for(var i=0;i<guilds.length;i++){
-            var g=guilds[i], avatar=g.icon?"https://cdn.discordapp.com/icons/"+g.id+"/"+g.icon+".png":"default.png";
-            html+='<img class="server-avatar" id="guild_'+g.id+'" src="'+avatar+'" style="width:40px;height:40px;border-radius:50%;margin:6px;cursor:pointer;border:2px solid transparent" onclick="selectGuild(\''+g.id+'\')">';
-        }
+        var html='<img src="logo.png" id="logoBtn" style="width:42px;height:42px;margin-bottom:8px;cursor:pointer;">';
+        for(var i=0;i<guilds.length;i++){var g=guilds[i];var avatar=g.icon?"https://cdn.discordapp.com/icons/"+g.id+"/"+g.icon+".png":"default.png";html+='<img class="server-avatar" id="guild_'+g.id+'" src="'+avatar+'" onclick="selectGuild(\''+g.id+'\')">';}
         root.innerHTML=html;
-        var logo=document.getElementById("logoBtn"); if(logo) logo.addEventListener("click",toggleDMs);
-        if(guilds.length>0) selectGuild(guilds[0].id);
+        var logo=document.getElementById("logoBtn");if(logo)logo.addEventListener("click",toggleDMs);
+        if(guilds.length>0)selectGuild(guilds[0].id);
     });
 }
+function selectGuild(guildId){selectedGuild=guildId;currentMode="guild";loadChannels(guildId);}
+function loadChannels(guildId){proxyFetch("guilds/"+guildId+"/channels","GET",null,function(channels){var html="";if(channels&&channels.length){for(var i=0;i<channels.length;i++){var c=channels[i];if(c.type===0)html+='<button class="channel" onclick="selectChannel(\''+c.id+'\',this)">'+escapeHtml(c.name)+'</button>';}}else html="<i style='padding:8px;display:block;color:#bbb'>No access or channels</i>";document.getElementById("channels").innerHTML=html;var btns=document.getElementsByClassName("channel");if(btns&&btns.length)selectChannel(btns[0].getAttribute("onclick").match(/'([^']+)'/)[1],btns[0]);});}
+function selectChannel(id,btn){selectedChannel=id;selectedDM=null;var btns=document.getElementsByClassName("channel");for(var i=0;i<btns.length;i++)btns[i].className="channel";if(btn)btn.className="channel selected";loadMessages(id);}
+function loadMessages(id){if(!id)return;proxyFetch("channels/"+id+"/messages?limit=25","GET",null,function(msgs){var out="";if(!msgs||!msgs.length){document.getElementById("messages").innerHTML="<i style='color:#bbb'>No messages</i>";return;}for(var i=msgs.length-1;i>=0;i--){var m=msgs[i];out+='<div class="message">';out+='<b onclick="showProfile(\''+m.author.id+'\',event)">'+escapeHtml(m.author.username)+'</b>: '+escapeHtml(m.content||"")+'<br>';if(m.attachments&&m.attachments.length){for(var j=0;j<m.attachments.length;j++){var a=m.attachments[j];var url=a.url||a.proxy_url||a.filename;if(a.height&&a.width&&/\.(mp4|webm|mov)$/i.test(a.filename)){out+='<video controls src="'+url+'"></video>';}else if(a.content_type&&a.content_type.indexOf("video/")===0){out+='<video controls src="'+url+'"></video>';}else{out+='<img src="'+url+'">';}}}out+='</div>';}var mdiv=document.getElementById("messages");mdiv.innerHTML=out;mdiv.scrollTop=mdiv.scrollHeight;});}
+function toggleDMs(){if(currentMode==="guild"){currentMode="dm";loadDMs();}else{currentMode="guild";if(selectedGuild)loadChannels(selectedGuild);}}
+function loadDMs(){proxyFetch("users/@me/channels","GET",null,function(channels){var html="";for(var i=0;i<channels.length;i++){var c=channels[i];var name=(c.type===1&&c.recipients&&c.recipients[0])?c.recipients[0].username:(c.name||"Group");html+='<button class="channel" onclick="selectDM(\''+c.id+'\',this)">'+escapeHtml(name)+'</button>';}document.getElementById("channels").innerHTML=html;});}
+function selectDM(dmId,btn){selectedDM=dmId;selectedChannel=null;var btns=document.getElementsByClassName("channel");for(var i=0;i<btns.length;i++)btns[i].className="channel";if(btn)btn.className="channel selected";loadMessages(dmId);}
 
-function selectGuild(guildId){ selectedGuild=guildId; currentMode="guild"; loadChannels(guildId); }
-function loadChannels(guildId){
-    proxyFetch("guilds/"+guildId+"/channels","GET",null,function(channels){
-        var html=""; if(channels&&channels.length){ for(var i=0;i<channels.length;i++){ var c=channels[i]; if(c.type===0) html+='<button class="channel" onclick="selectChannel(\''+c.id+'\', this)">'+escapeHtml(c.name)+'</button>'; } }
-        else html="<i style='padding:8px;display:block;color:#bbb'>No access or channels</i>";
-        document.getElementById("channels").innerHTML=html;
-        var btns=document.getElementsByClassName("channel");
-        if(btns && btns.length) selectChannel(btns[0].getAttribute("onclick").match(/'([^']+)'/)[1],btns[0]);
-    });
-}
-
-function selectChannel(channelId,btn){ selectedChannel=channelId; selectedDM=null;
-    var btns=document.getElementsByClassName("channel"); for(var i=0;i<btns.length;i++) btns[i].className="channel"; if(btn) btn.className="channel selected";
-    loadMessages(channelId);
-}
-
-function loadMessages(channelId){
-    if(!channelId) return;
-    proxyFetch("channels/"+channelId+"/messages?limit=25","GET",null,function(msgs){
-        var out="", mdiv=document.getElementById("messages"); if(!msgs||!msgs.length){ mdiv.innerHTML="<i style='color:#bbb'>No messages</i>"; return; }
-        for(var i=msgs.length-1;i>=0;i--){
-            var m=msgs[i]; out+='<div class="message">';
-            out+='<b onclick="showProfile(\''+m.author.id+'\', event)">'+escapeHtml(m.author.username)+'</b>: '+escapeHtml(m.content||"")+'<br>';
-            if(m.attachments && m.attachments.length){ for(var j=0;j<m.attachments.length;j++){ var a=m.attachments[j], url=a.url||a.proxy_url||a.filename, filename=a.filename||""; if(a.height && a.width && /\.(mp4|webm|mov)$/i.test(filename)){ out+='<video controls src="'+url+'"></video>'; } else if(a.content_type && a.content_type.indexOf("video/")===0){ out+='<video controls src="'+url+'"></video>'; } else{ out+='<img src="'+url+'">'; } } }
-            out+='</div>';
-        }
-        mdiv.innerHTML=out; mdiv.scrollTop=mdiv.scrollHeight;
-    });
-}
-
-function toggleDMs(){ if(currentMode==="guild"){ currentMode="dm"; loadDMs(); } else { currentMode="guild"; if(selectedGuild) loadChannels(selectedGuild); } }
-function loadDMs(){ proxyFetch("users/@me/channels","GET",null,function(channels){ var html=""; for(var i=0;i<channels.length;i++){ var c=channels[i], name=(c.type===1 && c.recipients && c.recipients[0])?c.recipients[0].username:(c.name||"Group"); html+='<button class="channel" onclick="selectDM(\''+c.id+'\', this)">'+escapeHtml(name)+'</button>'; } document.getElementById("channels").innerHTML=html; }); }
-function selectDM(dmId,btn){ selectedDM=dmId; selectedChannel=null; var btns=document.getElementsByClassName("channel"); for(var i=0;i<btns.length;i++) btns[i].className="channel"; if(btn) btn.className="channel selected"; loadMessages(dmId); }
-
+/* SEND MESSAGE */
 function sendMessage(){
-    var targetId=(currentMode==="guild")?selectedChannel:selectedDM; if(!targetId) return alert("Select a channel or DM first");
+    var targetId=(currentMode==="guild")?selectedChannel:selectedDM;
+    if(!targetId)return alert("Select a channel or DM first");
     var content=document.getElementById("msgInput").value||"";
     if(fileList.length>0){
-        var form=new FormData(); for(var i=0;i<fileList.length;i++) form.append("file",fileList[i],fileList[i].name); if(content) form.append("content",content);
-        proxyFetch("channels/"+targetId+"/messages","POST",form,function(){ document.getElementById("msgInput").value=""; clearFileSelection(); loadMessages(targetId); },true);
-    } else if(content){ proxyFetch("channels/"+targetId+"/messages","POST",{content:content},function(){ document.getElementById("msgInput").value=""; loadMessages(targetId); }); }
+        var form=new FormData();
+        for(var i=0;i<fileList.length;i++)form.append("file",fileList[i],fileList[i].name);
+        if(content)form.append("content",content);
+        proxyFetch("channels/"+targetId+"/messages","POST",form,function(){document.getElementById("msgInput").value="";clearFileSelection();loadMessages(targetId);},true);
+    }else if(content)proxyFetch("channels/"+targetId+"/messages","POST",{content:content},function(){document.getElementById("msgInput").value="";loadMessages(targetId);});
 }
-
 document.getElementById("msgSend").addEventListener("click",sendMessage);
-document.getElementById("msgInput").addEventListener("keypress",function(e){ if(e.keyCode===13) sendMessage(); });
+document.getElementById("msgInput").addEventListener("keypress",function(e){if(e.keyCode===13)sendMessage();});
 
+/* PROFILE POPUP */
 function showProfile(userId,event){
-    proxyFetch("users/"+userId,"GET",null,function(user){
-        var div=document.getElementById("profilePreview"); div.style.left=(event.clientX+8)+"px"; div.style.top=(event.clientY+8)+"px"; div.style.display="block";
-        var html="<b>"+escapeHtml(user.username||"Unknown")+(user.discriminator?("#"+user.discriminator):"")+"</b><br>";
-        if(user.avatar) html+='<img src="https://cdn.discordapp.com/avatars/'+user.id+'/'+user.avatar+'.png" style="width:80px;height:80px;border-radius:6px;"><br>';
-        html+="ID: "+(user.id||""); div.innerHTML=html;
-    });
+    proxyFetch("users/"+userId,"GET",null,function(user){var div=document.getElementById("profilePreview");div.style.left=(event.clientX+8)+"px";div.style.top=(event.clientY+8)+"px";div.style.display="block";var html="<b>"+escapeHtml(user.username||"Unknown")+(user.discriminator?("#"+user.discriminator):"")+"</b><br>";if(user.avatar)html+='<img src="https://cdn.discordapp.com/avatars/'+user.id+'/'+user.avatar+'.png" style="width:80px;height:80px;border-radius:6px;"><br>';html+="ID: "+(user.id||"");div.innerHTML=html;});
 }
-document.addEventListener("click",function(e){ if(!e.target.closest(".message b")) document.getElementById("profilePreview").style.display="none"; });
+document.addEventListener("click",function(e){if(!e.target.closest(".message b"))document.getElementById("profilePreview").style.display="none";});
 
-// auto-refresh messages every 5s
-setInterval(function(){ var target=(currentMode==="guild")?selectedChannel:selectedDM; if(target) loadMessages(target); },5000);
+/* UTILITIES */
+function escapeHtml(s){if(!s)return"";return String(s).replace(/[&<>"']/g,function(m){return{"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m];});}
 
+/* PERIODIC REFRESH */
+setInterval(function(){var target=(currentMode==="guild")?selectedChannel:selectedDM;if(target)loadMessages(target);},5000);
+
+/* START */
 loadGuilds();
 </script>
 </body>
